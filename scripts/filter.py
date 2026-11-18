@@ -76,6 +76,23 @@ def generic_signal(x, A, w, loc=0, m=0, b=0):
     linear_component = (m*(x-loc) + b)
     return wiggle_component + linear_component
 
+# if __name__=="__main__":
+    
+#     amps = np.linspace(0, 1, 10)
+#     widths = np.linspace(0, 1, 10)
+#     ms = np.linspace(0, 1, 10)
+
+#     x = np.linspace(-2,2,100)
+
+#     fig, axs = plt.subplots(1,3,figsize=[24,8])
+
+#     for a in amps:
+#         axs[0].plot(x, generic_signal())
+
+
+
+
+
 def rms_residual(data, model, **model_args):
     """
     model is a Function with args model_args
