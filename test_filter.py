@@ -54,11 +54,11 @@ import artpop
 orbit='gd1'
 perturber_dict = {
     "mass":1e7,
-    "scaleRadius":1,
-    "truncationRadius":1,
+    "scaleRadius":1.,
+    "truncationRadius":1.,
     "b":0,
-    "v": 150,
-    "t_impact":0.4 / tse.timeUnitGyr,
+    "v": 100,
+    "t_impact":0.1 / tse.timeUnitGyr,
     'phi1_today':10,
     'b_trl':np.array([0,0,1]),
     'v_trl':np.array([1/np.sqrt(2),1/np.sqrt(2),0]),
@@ -68,7 +68,6 @@ perturber_dict = {
 print("generating perturbed stream. ")
 # one bad row (e.g. a NaN subrt, which agama refuses as a truncation radius) used to kill
 # the task and lose the rest of the chunk. now it's logged and skipped.
-
 pert_dict_out = tse.gen_perturbed_stream(orbit,
                                             perturber_dict,
                                             fname=None,
@@ -83,24 +82,24 @@ stars_w, prog_w = pert_dict_out['stars_w'], pert_dict_out['prog_w'] #<-- eventua
 ssc_table, streamframe, track = inputs.inputs_galactocentric(stars_w, prog_w, Glim=30, m_pop=1e4) # TODO: LET THE SSP TOTAL MASS CHANGE!
 # %%
 fig, ax = plt.subplots(figsize=(8,3))
-ax.scatter(ssc_table['phi1'], ssc_table['v_gsr'], s=1, c='k')
+ax.scatter(ssc_table['phi1'], 
+           ssc_table['v_gsr'], 
+           s=1, 
+           c='k')
 # %%
-
 #---------------------------------------------------#
 #   creating the grid that the filter will search   #
 #   over; depends on the span of the stream in      #
 #   phi1, how many points i want                    #
 #---------------------------------------------------#
-
-
 # create the grid to search over
 loc_grid = np.arange(min(ssc_table['phi1']), max(ssc_table['phi1']), 1) # degree increments. 
 
-n_points = 80
+n_points = 100
 stream_length = max(loc_grid) - min(loc_grid)
-wmin = stream_length / 1000
-wmax = stream_length / 15
-w_grid = np.linspace(wmin, wmax, n_points) # this basically makes sense for GD1; trying to keep it proportional for the stubbier streams. 
+wmin = stream_length / 2000
+wmax = stream_length / 10
+w_grid = np.geomspace(wmin, wmax, n_points) # this basically makes sense for GD1; trying to keep it proportional for the stubbier streams. 
 
 # perturbation locations and widths:
 grid_dict = {
@@ -156,7 +155,7 @@ fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table, uncertainties=un
 # the ghost signature. each label ends with the ghost_flags class (flagged peaks dashed).
 # peaks, z and var_between/var_within come from margs above
 # (flat w prior), so if w_prior here is 'log' the curves change but the labels don't.
-w_prior = 'flat'
+w_prior = 'log'
 w_ax = np.asarray(grid_dict['w'])
 fig, axs = plt.subplots(len(filter.GRID_KEYS), 1, figsize=(7, 2.6*len(filter.GRID_KEYS)),
                         sharex=True, constrained_layout=True)
