@@ -17,7 +17,7 @@ $$
 where $a = -\frac{2 G M_{\rm sub}}{v_{\rm enc}}$ and $w=\frac{b v_{\rm enc}}{v_{\perp}}$. The extrema of this expression are located at $\pm w$ (the "width" of the signal) and have values $A=\pm a/2w$ (intuitively this makes sense, by making $w$ larger we're decreasing the perpendicular relative to the total encounter velocity, both broadening the perturbation and reducing amplitude). We can also write
 
 $$
-y = \frac{(2wA)(x-l)}{(x-l)^2 + w^2}, \tag{1} = A\left[\frac{2w(x-l)}{(x-l)^2 + w^2}\right]
+y = \frac{(2wA)(x-l)}{(x-l)^2 + w^2} = A\left[\frac{2w(x-l)}{(x-l)^2 + w^2}\right]
 $$
 
 where now $A$ is the actual amplitude of the signal, and $l$ is its offset from zero so that the extrema are at $l\pm w$.
