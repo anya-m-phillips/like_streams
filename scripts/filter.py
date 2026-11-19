@@ -75,23 +75,34 @@ def generic_signal(x, A, w, loc=0, m=0, b=0):
     wiggle_component = (a * (x-loc) / ((x-loc)**2 + w**2))
     linear_component = (m*(x-loc) + b)
     return wiggle_component + linear_component
+# %%
+if __name__=="__main__":
 
-# if __name__=="__main__":
-    
-#     amps = np.linspace(0, 1, 10)
-#     widths = np.linspace(0, 1, 10)
-#     ms = np.linspace(0, 1, 10)
+    n=15
+    amps = np.linspace(0.1, 2, n)
+    widths = np.linspace(0.1, 3, n)
+    ms = np.linspace(-0.5, 0.5, n)
 
-#     x = np.linspace(-2,2,100)
+    x = np.linspace(-6,6,500)
 
-#     fig, axs = plt.subplots(1,3,figsize=[24,8])
+    fig, axs = plt.subplots(1,3,figsize=[24,8], sharey=True)
+    plt.subplots_adjust(wspace=0, hspace=0)
+    colors=cmr.torch(np.linspace(0, 0.9, n))
+    for ii, a in enumerate(amps):
+        axs[0].plot(x, generic_signal(x, a, w=1), color=colors[ii])
+    for ii, w in enumerate(widths):
+        axs[1].plot(x, generic_signal(x,A=2, w=w ), color=colors[ii])
 
-#     for a in amps:
-#         axs[0].plot(x, generic_signal())
+    colors = plt.cm.coolwarm(np.linspace(0, 1, n))
+    for ii, m in enumerate(ms):
+        axs[2].plot(x, generic_signal(x, A=1, w=0.75, m=m), color=colors[ii])
+        axs[2].plot(x, m*x, color=colors[ii], ls=':', lw=2)
 
-
-
-
+    axs[0].set_title(r'Varying $A$')
+    axs[1].set_title(r'Varying $w$')
+    axs[2].set_title(r'Varying $m$')
+    plt.savefig("example_filter.png")
+# %%
 
 def rms_residual(data, model, **model_args):
     """
