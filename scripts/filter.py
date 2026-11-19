@@ -17,10 +17,8 @@ from scipy.optimize import brentq
 
 # plt.style.use('vedant') #<-- won't work on cannon. need vedant.mplstyle in scripts
 import sys
-# repo_path = '/Users/anyaphillips/Desktop/harvard/research/THE_STREAM_IMPACT_EXPLORER'
-repo_path = '/n/home02/amphillips/THE_STREAM_IMPACT_EXPLORER'
-plt.style.use(repo_path+'/scripts/vedant.mplstyle')
-sys.path.append(repo_path+'/scripts')
+from paths import repo_path, MPLSTYLE, DISSOLVED_STREAMS_DIR  # machine-specific paths, see paths.py
+plt.style.use(MPLSTYLE)
 import functions as f
 import tsetse as tse
 from streamframe import StreamFrame
@@ -39,12 +37,9 @@ from astropy.table import Table
 import pickle
 
 from pygaia.errors.astrometric import parallax_uncertainty, proper_motion_uncertainty, total_proper_motion_uncertainty, total_position_uncertainty
-sys.path.append("/n/home02/amphillips/software/viamock")
-import viamock
-sys.path.append("/n/home02/amphillips/.conda/envs/petar_env/lib/python3.10/site-packages") #<-- possibly a rly crazy thing to do lol. 
+import viamock  # viamock + extra site-packages are put on sys.path by paths.py
 import artpop
 
-sys.path.append(repo_path)
 import inputs
 # %%
 def generic_signal(x, A, w, loc=0, m=0, b=0):
@@ -485,7 +480,7 @@ def fit_baseline(ssc, key, l, w, A, sig, window_width,
 def plot_stream(table, i, orbit, **scatter_kwargs):
     row = table[i]
 
-    indir = "/n/netscratch/conroy_lab/Lab/amphillips/tsetse_analysis/perturbed_ps_streams_dissolved/%s/"%orbit
+    indir = DISSOLVED_STREAMS_DIR + "%s/"%orbit
 
     fname = "%s_%i.pickle"%(orbit, i)
 
@@ -1099,9 +1094,10 @@ def ghost_flags(margs, grid_dict, res, peaks, w_prior='flat', edge_frac=0.05,
 def plot_detections(res, grid_dict, ssc, uncertainties=False, z_thresh=5., phi1_true=None,
                     subtract_poly=False, poly_deg=5, prog_subtracted=None,
                     margs=None, prof=None, w_meds=None, peaks=None, w_prior='flat',
-                    precision_limits=None, ghosts=None, show_ghosts=True, verbose=True):
+                    precision_limits=None, ghosts=None, show_ghosts=True, keys=None,
+                    keep_peaks=None, verbose=True):
     """
-    the 4x3 diagnostic figure for one gridsearch, one row per dimension:
+    the 4x3 diagnostic figure for one gridsearch, one row per dimension (or fewer rows, see keys):
         left:   the noiseless stream, every star (no precision cut), for reference
         middle: the detection statistic z(l), labelled A/sigma (it's the analogue of the
                 amplitude over its uncertainty; see marginal_A), with +-z_thresh lines
@@ -1134,11 +1130,21 @@ def plot_detections(res, grid_dict, ssc, uncertainties=False, z_thresh=5., phi1_
     ghosts: optional ghost_flags output for these peaks. flagged peaks are drawn in
         light coral (dots and wiggles) instead of green, or left out entirely if
         show_ghosts=False. None flags nothing.
-    verbose: print, per dimension, the number of l with |z| >= z_thresh and each peak's
-        l, z, A (5-95%) and w (and its ghost_flags class, if ghosts is given).
+    keys: which dimensions to plot, as a list of GRID_KEYS names (e.g. ['phi2', 'v_gsr'])
+        or their indices into GRID_KEYS, one row each in the order given. None plots all.
+    keep_peaks: which peaks to draw, as a dict {key: positions into peaks[k]} (the
+        "[i]" numbers in the verbose printout, i.e. 0 is the lowest-l peak). dimensions
+        left out of the dict keep all their peaks; an empty list hides them all. e.g.
+        keep_peaks={'phi2': [0, 2], 'v_gsr': []}. display only: peaks and ghosts are
+        unchanged, and show_ghosts still applies to the kept peaks.
+    verbose: print, per plotted dimension, the number of l with |z| >= z_thresh and each
+        peak's position [i], l, z, A (5-95%) and w (and its ghost_flags class, if ghosts
+        is given). peaks hidden by keep_peaks are marked "(hidden)".
 
-    returns (fig, axs, out), where out is a dict with 'margs', 'prof', 'w_meds', 'peaks',
-    'ghosts' and 'poly' (per dimension, the fitted numpy Polynomial, or None).
+    returns (fig, axs, out), where axs has shape (len(keys), 3) and out is a dict with
+    'margs', 'prof', 'w_meds', 'peaks', 'ghosts', 'keys' (the plotted GRID_KEYS names)
+    and 'poly' (per dimension in GRID_KEYS order, the fitted numpy Polynomial, or None
+    if not fitted or not plotted).
     """
     if subtract_poly and prog_subtracted:
         raise ValueError("subtract_poly=True, but the stream is already straightened "
@@ -1163,41 +1169,70 @@ def plot_detections(res, grid_dict, ssc, uncertainties=False, z_thresh=5., phi1_
         flags = [g['flag'] for g in ghosts]
     GHOST_C = 'lightcoral'
 
+    # which dimensions to plot
+    if keys is None:
+        keys = list(GRID_KEYS)
+    keys = [GRID_KEYS[kk] if isinstance(kk, (int, np.integer)) else kk for kk in keys]
+    bad = [kk for kk in keys if kk not in GRID_KEYS]
+    if bad:
+        raise ValueError("keys %s not in GRID_KEYS %s" % (bad, list(GRID_KEYS)))
+
+    # which peaks to draw, per dimension (True = drawn)
+    keep_peaks = {} if keep_peaks is None else keep_peaks
+    bad = [kk for kk in keep_peaks if kk not in GRID_KEYS]
+    if bad:
+        raise ValueError("keep_peaks keys %s not in GRID_KEYS %s" % (bad, list(GRID_KEYS)))
+    shown = []
+    for k, key in enumerate(GRID_KEYS):
+        n_pk = len(peaks[k])
+        mask = np.ones(n_pk, dtype=bool)
+        if key in keep_peaks:
+            sel = np.atleast_1d(np.asarray(keep_peaks[key], dtype=int))
+            if np.any((sel >= n_pk) | (sel < -n_pk)):
+                raise ValueError("keep_peaks[%r] = %s, but %s only has %i peaks (positions 0-%i)"
+                                 % (key, sel.tolist(), key, n_pk, n_pk - 1))
+            mask[:] = False
+            mask[sel] = True
+        shown.append(mask)
+
     l_grid = grid_dict['l']
     window_width = res['window_width']
     il_true = None if phi1_true is None else np.argmin(np.abs(l_grid - phi1_true))
     x_data = np.asarray(ssc['phi1_noised'] if unc else ssc['phi1'], dtype=float)
     x_true = np.asarray(ssc['phi1'], dtype=float)
-    polys = []
+    polys = [None] * nk
 
-    fig, axs = plt.subplots(nk, 3, figsize=[18, 3*nk], sharex=True)
-    for k, key in enumerate(GRID_KEYS):
+    nrow = len(keys)
+    fig, axs = plt.subplots(nrow, 3, figsize=[18, 3*nrow], sharex=True, squeeze=False)
+    for row, key in enumerate(keys):
+        k = GRID_KEYS.index(key)
         mg = margs[k]
-        ipk, flag = np.asarray(peaks[k], dtype=int), flags[k]
+        ipk, flag, show = np.asarray(peaks[k], dtype=int), flags[k], shown[k]
 
         # middle: detection statistic, with the peaks (ghost-flagged ones in light coral)
-        ax = axs[k, 1]
+        ax = axs[row, 1]
         ax.plot(l_grid, mg['z'], c='k', lw=1)
-        ax.scatter(l_grid[ipk[~flag]], mg['z'][ipk[~flag]], c='mediumseagreen', s=15, zorder=3)
+        real = show & ~flag
+        ax.scatter(l_grid[ipk[real]], mg['z'][ipk[real]], c='mediumseagreen', s=15, zorder=3)
         if show_ghosts:
-            ax.scatter(l_grid[ipk[flag]], mg['z'][ipk[flag]], c=GHOST_C, s=15, zorder=3)
+            gh = show & flag
+            ax.scatter(l_grid[ipk[gh]], mg['z'][ipk[gh]], c=GHOST_C, s=15, zorder=3)
         for s in (1, -1):
             ax.axhline(s*z_thresh, c='tomato', lw=0.8, ls='--')
         ax.axhline(0, c='grey', lw=0.5)
         ax.set_ylabel(r'$A_{%s}/\sigma$' % SYMBOLS[key])
 
         # right: the stream the filter saw, with a wiggle at each peak
-        ax = axs[k, 2]
+        ax = axs[row, 2]
         y_data = np.asarray(ssc[key+"_noised"] if unc else ssc[key], dtype=float)
         good = (obs_limit(ssc, key, None if precision_limits is None else precision_limits.get(key))
                 if unc else np.ones(len(y_data), dtype=bool))
         if subtract_poly:
             fit_ok = good & np.isfinite(x_data) & np.isfinite(y_data)
             poly = np.polynomial.Polynomial.fit(x_data[fit_ok], y_data[fit_ok], poly_deg)
-            polys.append(poly)
+            polys[k] = poly
         else:
             poly = lambda xx: np.zeros_like(xx, dtype=float)
-            polys.append(None)
         y_plot = y_data - poly(x_data)
         # stars dropped by the precision cut in this dimension, for reference
         ax.scatter(x_data[~good], y_plot[~good], c='lightgrey', s=.1, rasterized=True, zorder=0)
@@ -1205,8 +1240,8 @@ def plot_detections(res, grid_dict, ssc, uncertainties=False, z_thresh=5., phi1_
         # the cut stars have big errors, so scale the axis to the ones that pass
         lo, hi = np.nanpercentile(y_plot[good], [0.5, 99.5])
         ax.set_ylim(lo - 0.1*(hi-lo), hi + 0.1*(hi-lo))
-        for ip, is_ghost in zip(ipk, flag):
-            if is_ghost and not show_ghosts:
+        for ip, is_ghost, is_shown in zip(ipk, flag, show):
+            if not is_shown or (is_ghost and not show_ghosts):
                 continue
             l_pk, A_pk, w_pk = l_grid[ip], mg['q'][ip, 1], w_meds[k][ip]
             # the best line given this wiggle, at the profile's best stream width
@@ -1221,7 +1256,7 @@ def plot_detections(res, grid_dict, ssc, uncertainties=False, z_thresh=5., phi1_
 
         # left: the noiseless stream, every star. with subtract_poly it gets its own fit
         # (to all the noiseless stars), since the noised fit is poorly pinned at the ends
-        ax = axs[k, 0]
+        ax = axs[row, 0]
         y_true = np.asarray(ssc[key], dtype=float)
         if subtract_poly:
             ok = np.isfinite(x_true) & np.isfinite(y_true)
@@ -1235,7 +1270,7 @@ def plot_detections(res, grid_dict, ssc, uncertainties=False, z_thresh=5., phi1_
         ax.set_ylabel(YLABELS[key])
 
         if phi1_true is not None:
-            for ax in axs[k]:
+            for ax in axs[row]:
                 ax.axvline(phi1_true, c='g', lw=1, zorder=0)
 
         if verbose:
@@ -1246,9 +1281,10 @@ def plot_detections(res, grid_dict, ssc, uncertainties=False, z_thresh=5., phi1_
                          % (mg['z'][il_true], mg['var_between'][il_true] / mg['var_within'][il_true]))
             print(line)
             for i, ip in enumerate(ipk):
-                print("         peak at l = %6.1f: z = %+6.2f, A = %+.4g (5-95%%: %+.4g, %+.4g), w = %.2f%s"
-                      % (l_grid[ip], mg['z'][ip], mg['q'][ip, 1], mg['q'][ip, 0], mg['q'][ip, 2], w_meds[k][ip],
-                         "" if ghosts is None else ", " + ghosts[k]['class'][i]))
+                print("     [%i] peak at l = %6.1f: z = %+6.2f, A = %+.4g (5-95%%: %+.4g, %+.4g), w = %.2f%s%s"
+                      % (i, l_grid[ip], mg['z'][ip], mg['q'][ip, 1], mg['q'][ip, 0], mg['q'][ip, 2], w_meds[k][ip],
+                         "" if ghosts is None else ", " + ghosts[k]['class'][i],
+                         "" if show[i] else " (hidden)"))
 
     poly_note = (" − degree-%i polynomial in $\\phi_1$" % poly_deg) if subtract_poly else ""
     axs[0, 0].set_title("noiseless, all stars" + poly_note, fontsize=10)
@@ -1262,7 +1298,7 @@ def plot_detections(res, grid_dict, ssc, uncertainties=False, z_thresh=5., phi1_
     axs[-1, 2].set_xlabel(r'$\phi_1$ [deg]')
     fig.tight_layout()
     return fig, axs, {'margs': margs, 'prof': prof, 'w_meds': w_meds, 'peaks': peaks,
-                      'ghosts': ghosts, 'poly': polys}
+                      'ghosts': ghosts, 'keys': keys, 'poly': polys}
 
 
 # %%

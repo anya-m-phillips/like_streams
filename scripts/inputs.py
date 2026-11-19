@@ -15,9 +15,8 @@ from scipy.optimize import brentq
 
 # plt.style.use('vedant') #<-- won't work on cannon. need vedant.mplstyle in scripts
 import sys
-repo_path = '/n/home02/amphillips/like_streams'
-plt.style.use(repo_path+'/scripts/vedant.mplstyle')
-sys.path.append(repo_path+'/scripts')
+from paths import repo_path, MPLSTYLE, DISSOLVED_STREAMS_DIR  # machine-specific paths, see paths.py
+plt.style.use(MPLSTYLE)
 import functions as f
 import tsetse as tse
 from streamframe import StreamFrame
@@ -51,12 +50,9 @@ from astropy.table import Table
 import pickle
 
 from pygaia.errors.astrometric import parallax_uncertainty, proper_motion_uncertainty, total_proper_motion_uncertainty, total_position_uncertainty
-sys.path.append("/n/home02/amphillips/software/viamock")
-import viamock
-sys.path.append("/n/home02/amphillips/.conda/envs/petar_env/lib/python3.10/site-packages") #<-- possibly a rly crazy thing to do lol. 
+import viamock  # viamock + extra site-packages are put on sys.path by paths.py
 import artpop
 
-sys.path.append(repo_path)
 # import filter_v2 as filter
 # %%
 def get_noise(ssc_table, noise_seed=42):
@@ -123,7 +119,7 @@ def inputs_agama(orbit, pert_table, index=1636, paint_seed=42, noise_seed=42, Gl
     i=index
     row = pert_table[pert_table['ID']==i]
 
-    indir = "/n/netscratch/conroy_lab/Lab/amphillips/tsetse_analysis/perturbed_ps_streams_dissolved/%s/"%orbit
+    indir = DISSOLVED_STREAMS_DIR + "%s/"%orbit
     fname = "%s_%i.pickle"%(orbit, i)
 
     with open(indir+fname, 'rb') as handle:

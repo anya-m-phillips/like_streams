@@ -4,13 +4,11 @@ import numpy as np
 # import matplotlib.pyplot as plt
 # plt.style.use('vedant') #<-- won't work on cannon. need vedant.mplstyle in scripts
 import sys
-repo_path = '/n/home02/amphillips/like_streams'
-sys.path.append(repo_path+'/scripts/')
+from paths import repo_path, PERTURBED_STREAMS_DIR  # machine-specific paths, see paths.py
 from streamframe import StreamFrame
 import astropy.units as u
 from tqdm import tqdm
 
-sys.path.append(repo_path+"/scripts")
 import functions as f
 ### agama setup: 
 agama.setUnits(length=1, velocity=1, mass=1)   # kpc, km/s, Msun
@@ -416,11 +414,36 @@ def _evolve_snapshots_breaks(pot_tot, ic_stream, time_seed, snap_times, time_end
                     out[live, i] = orb(snap_times[live])
                 xv[i] = orb(orb[len(orb)-1])
         else:
-            _, x_end = agama.orbit(potential=pot_tot, ic=xv[go], time=E-t_now[go], timestart=t_now[go],
-                                   trajsize=1, dtype='float64', separateTime=True, verbose=False)
-            xv[go] = np.reshape(x_end, (len(go), 6))
+            xv[go] = _orbit_endpoints(pot_tot, xv[go], time=E-t_now[go], timestart=t_now[go])
         t_now[go] = E
     return out
+
+
+_AGAMA_HAS_SEPARATE_TIME = None   # worked out on the first call
+
+def _orbit_endpoints(potential, ic, time, timestart):
+    """
+    final 6d phase-space point of each orbit, as an (N, 6) array.
+
+    agama builds differ: some take separateTime=True and return (times, traj); others
+    (e.g. agama 1.0.156 on my laptop) reject that keyword and return an Nx2 object
+    array of [times, traj] per orbit. try the first, fall back to the second.
+    """
+    global _AGAMA_HAS_SEPARATE_TIME
+    n = len(ic)
+    kw = dict(potential=potential, ic=ic, time=time, timestart=timestart,
+              trajsize=1, dtype='float64', verbose=False)
+    if _AGAMA_HAS_SEPARATE_TIME is not False:
+        try:
+            _, x_end = agama.orbit(separateTime=True, **kw)
+            _AGAMA_HAS_SEPARATE_TIME = True
+            return np.reshape(x_end, (n, 6))
+        except TypeError as e:
+            if 'separateTime' not in str(e):
+                raise
+            _AGAMA_HAS_SEPARATE_TIME = False
+    res = np.reshape(np.asarray(agama.orbit(**kw), dtype=object), (n, 2))
+    return np.array([np.reshape(traj, (-1, 6))[-1] for traj in res[:, 1]], dtype=float)
 
 
 def orbit_with_breaks(potential, ic, timestart, time, trajsize, breaks=None):
@@ -1143,7 +1166,7 @@ def straighten_stream_orbit_interp_agama(
 #     composite/wrapper functions for stream generation      #
 #------------------------------------------------------------#
 def gen_unperturbed_stream(orbit, fname, Nstars=10000,
-                           outdir='/n/netscratch/conroy_lab/Lab/amphillips/tsetse_analysis/perturbed_ps_streams/',
+                           outdir=PERTURBED_STREAMS_DIR,
                            mass_loss=True, tdis_gyr=0.1):
     """
     the null stream for an orbit (massless subhalo), saved as its ssc dict.
@@ -1219,7 +1242,7 @@ def gen_unperturbed_stream(orbit, fname, Nstars=10000,
 
 def gen_perturbed_stream(orbit, perturber_dict, fname, Nstars=4000,
                          save=True,
-                           outdir='/n/netscratch/conroy_lab/Lab/amphillips/tsetse_analysis/perturbed_ps_streams/',
+                           outdir=PERTURBED_STREAMS_DIR,
                            mass_loss=True, tdis_gyr=0.1
                            ):
     """

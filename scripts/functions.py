@@ -53,7 +53,7 @@ def reflex_correct(coords, galactocentric_frame=None):
 
 
 import sys
-sys.path.append('/Users/anyaphillips/Desktop/harvard/research/THE_STREAM_IMPACT_EXPLORER/scripts/')
+import paths  # noqa: F401  puts scripts/ on sys.path so this repo's streamframe.py is used
 from streamframe import StreamFrame
 import astropy.units as u
 from tqdm import tqdm

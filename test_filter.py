@@ -17,9 +17,10 @@ from scipy.optimize import brentq
 
 # plt.style.use('vedant') #<-- won't work on cannon. need vedant.mplstyle in scripts
 import sys
-repo_path = '/n/home02/amphillips/like_streams'
-plt.style.use(repo_path+'/scripts/vedant.mplstyle')
-sys.path.append(repo_path+'/scripts')
+# machine-specific paths live in scripts/paths.py (picks cannon vs. my machine on its own)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd(), 'scripts'))
+from paths import repo_path, MPLSTYLE
+plt.style.use(MPLSTYLE)
 import functions as f
 import tsetse as tse
 from streamframe import StreamFrame
@@ -42,9 +43,7 @@ from astropy.table import Table
 import pickle
 
 from pygaia.errors.astrometric import parallax_uncertainty, proper_motion_uncertainty, total_proper_motion_uncertainty, total_position_uncertainty
-sys.path.append("/n/home02/amphillips/software/viamock")
-import viamock
-sys.path.append("/n/home02/amphillips/.conda/envs/petar_env/lib/python3.10/site-packages") #<-- possibly a rly crazy thing to do lol. 
+import viamock  # viamock + extra site-packages are put on sys.path by paths.py
 import artpop
 
 # %%
@@ -53,13 +52,13 @@ import artpop
 #--------------------------------------------------------------#
 orbit='gd1'
 perturber_dict = {
-    "mass":1e7,
-    "scaleRadius":1.,
-    "truncationRadius":1.,
+    "mass":5e6,
+    "scaleRadius":0.5,
+    "truncationRadius":0.5,
     "b":0,
     "v": 100,
-    "t_impact":0.1 / tse.timeUnitGyr,
-    'phi1_today':10,
+    "t_impact":0.05 / tse.timeUnitGyr,
+    'phi1_today':20,
     'b_trl':np.array([0,0,1]),
     'v_trl':np.array([1/np.sqrt(2),1/np.sqrt(2),0]),
     'ramp_frac':0.1 # idk
@@ -95,7 +94,7 @@ ax.scatter(ssc_table['phi1'],
 # create the grid to search over
 loc_grid = np.arange(min(ssc_table['phi1']), max(ssc_table['phi1']), 1) # degree increments. 
 
-n_points = 100
+n_points = 50
 stream_length = max(loc_grid) - min(loc_grid)
 wmin = stream_length / 2000
 wmax = stream_length / 10
@@ -145,7 +144,10 @@ fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table, uncertainties=un
                                 z_thresh=z_thresh, phi1_true=None,#phi1_true,
                                 # subtract_poly=False, poly_deg=5,
                                 # prog_subtracted=prog_subtracted,
-                                margs=margs, prof=None, w_meds=None, peaks=peaks,
+                                keys=['v_gsr'],
+                                keep_peaks={'v_gsr':[0]},
+                                margs=margs, 
+                                prof=None, w_meds=None, peaks=peaks,
                                 ghosts=ghosts, show_ghosts=show_ghosts)
 
 # %%
