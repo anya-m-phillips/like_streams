@@ -287,6 +287,7 @@ def inputs_galactocentric(stars_w, prog_w=None, potential=None, paint_seed=42, n
                           Glim=24., m_pop=None, 
                           stream_frame='great_circle', #<--- 'great_circle' or 'galactocentric'
                           distance=None, # if the streamframe is 'galactocentric' re-scale the magnitudes as if the progenitor is at this distance (if not none). TODO helper function for earth-progenitor distance.  
+                          subtract_orbit=True, #<-- only active if stream_frame='galactocentric
                           **track_kwargs):
     """
     TODO: OPTION TO RETURN THE TABLE IN GALACTOCENTRIC "STREAMFRAME" COORDINATES.
@@ -356,6 +357,9 @@ def inputs_galactocentric(stars_w, prog_w=None, potential=None, paint_seed=42, n
         if stream_frame=='great_circle':
             sf = streamframe #<-- the astropy coordinate frame object
         if stream_frame=='galactocentric':
+            if subtract_orbit==False:
+                sf, track=None, None
+                return ssc_table, sf, track
             sf = None #<-- so that the prog track will default to jake's frame
         track = prog_track_in_frame(prog_w, sf, potential=potential, **track_kwargs)
         if stream_frame=='galactocentric':

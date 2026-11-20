@@ -128,10 +128,11 @@ ax.scatter(stars_w[:,0], stars_w[:,1], s=1, c='k')
 print("creating stream for progenitor mass %i; rperi=%.1f"%(prog_mass, Rperi))
 ssc_table, streamframe, track = inputs.inputs_galactocentric(stars_w, prog_w, 
                                                              potential=pot_total, 
-                                                             distance=10, #kpc
+                                                             distance=20, #kpc
                                                              stream_frame='galactocentric',
+                                                             subtract_orbit=True,
                                                              Glim=24, m_pop=prog_mass) # TODO: LET THE SSP TOTAL MASS CHANGE!
-additional_clips = (np.abs(ssc_table['phi2'])<10) & (np.abs(ssc_table['v_gsr'])<50)
+additional_clips = np.ones(len(ssc_table), dtype=bool)# None #(np.abs(ssc_table['phi2'])<10) & (np.abs(ssc_table['v_gsr'])<50)
 
 fig, ax = plt.subplots(figsize=(8,3))
 ax.scatter(ssc_table['phi1'][additional_clips], 
@@ -212,6 +213,8 @@ fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table[additional_clips]
                                 margs=margs, 
                                 prof=None, w_meds=None, peaks=peaks,
                                 ghosts=ghosts, show_ghosts=show_ghosts)
+
+axs[-1,-1].set_ylim(-50,50)
 for row in axs:
     for ax in row:
         ax.set_xlim(lo, hi)
