@@ -106,7 +106,7 @@ import artpop
 #---------------------------------------------------------------------#
 #        examples with Lucas' streams in dreams potentials            #
 #---------------------------------------------------------------------#
-host_n = 1012
+host_n = 436
 host_dir = f'./lucas_streams/run_%i/'%host_n
 fsave = host_dir+'stream_catalog_run_%i.pkl'%host_n
 with open(fsave, 'rb') as f:
@@ -117,7 +117,12 @@ pot_dm = tse.load_potential(host_dir+'pot_dm_z0.ini')
 pot_total = pot_bar+pot_dm
 R_peris = catalog['Rperi']
 
+
+
 prog_masses = catalog['prog_mass']
+
+# do some cut on stream length
+
 prog_ws = catalog['prog_coords_z0']
 stars_ws = catalog['st_coords_z0']
 
@@ -136,17 +141,21 @@ ax.scatter(stars_w[:,0], stars_w[:,1], s=1, c='k')
 # print("creating stream for progenitor mass %i; rperi=%.1f"%(prog_mass, Rperi))
 ssc_table, streamframe, track = inputs.inputs_galactocentric(stars_w, prog_w, 
                                                              potential=pot_total, 
-                                                             distance=10, #kpc
+                                                             distance=None, #kpc
                                                              stream_frame='galactocentric',
                                                              subtract_orbit=True,
                                                              Glim=24, m_pop=prog_mass) # TODO: LET THE SSP TOTAL MASS CHANGE!
 
+
+### OPTION TO FIT AND SUBTRACT A 5th oRDER POLYNOMIAL TO THE NOIELESS DATA> 
+# additional_clips = np.ones(len(ssc_table), dtype=bool)# None #(np.abs(ssc_table['phi2'])<10) & (np.abs(ssc_table['v_gsr'])<50)
+additional_clips = np.abs(ssc_table['phi1'])<100
+ssc_table[additional_clips] = inputs.subtract_polynomial(ssc_table[additional_clips], n=5)
 # %%
-additional_clips = np.ones(len(ssc_table), dtype=bool)# None #(np.abs(ssc_table['phi2'])<10) & (np.abs(ssc_table['v_gsr'])<50)
 
 fig, ax = plt.subplots(figsize=(8,3))
 ax.scatter(ssc_table['phi1'][additional_clips], 
-           ssc_table['pm_phi1'][additional_clips], 
+           ssc_table['phi2'][additional_clips], 
            s=1, 
            c='k')
 
@@ -164,7 +173,7 @@ ax.scatter(ssc_table['phi1'][additional_clips],
 #   phi1, how many points i want                    #
 #---------------------------------------------------#
 # create the grid to search over
-lo, hi = np.quantile(ssc_table['phi1'], [0.01,0.99])
+lo, hi = np.quantile(ssc_table['phi1'], [0.05,0.95])
 stream_length = hi-lo
 if stream_length>200:
     lo, hi=-100,100
@@ -215,7 +224,7 @@ margs = [filter.marginal_A(res, grid_dict, k) for k in tqdm(range(len(filter.GRI
 # to get margs['z'] (or the detection statistic) we've inverted a standard gaussian CDF at P_+
 # %%
 # detections: local maxima of |z(l)| that reach z_thresh -- 
-z_thresh = 10
+z_thresh = 3
 peaks = filter.find_z_peaks(margs, z_thresh=z_thresh) # finds peaks in the amplitude (in units of its uncertainty) along the stream
 # ghost tests from the shape of p(w | l). rerun=True searches the peaks with no parent
 # again on a w grid extended past max(w), to see if p(w | l) follows the edge.
@@ -235,10 +244,10 @@ fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table[additional_clips]
                                 ghosts=ghosts, show_ghosts=show_ghosts)
 
 # axs[-1,-1].set_ylim(-50,50)
-for row in axs:
-    for ax in row:
-        # ax.set_xlim(lo, hi)
-        ax.set_xlim(-10,8)
+# for row in axs:
+#     for ax in row:
+#         ax.set_xlim(lo, hi)
+        # ax.set_xlim(-10,8)
 # %%
 
 # %%
