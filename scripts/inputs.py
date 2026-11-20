@@ -259,6 +259,13 @@ def ICRS_from_table(tab):
 def inputs_galactocentric(stars_w, prog_w=None, potential=None, paint_seed=42, noise_seed=42,
                           Glim=24., m_pop=None, **track_kwargs):
     """
+
+    TODO: OPTION TO RETURN THE TABLE IN GALACTOCENTRIC "STREAMFRAME" COORDINATES.
+          FOR DISTANCE I'D LIKE TO USE THE MEAN DISTANCE OF THE STREAM FROM THE EARTH, 
+          AND THEN JUST TAKE LIKE RENORMALIZE THE MAGNITUDES TO BE AT THAT DISTANCE PLUS
+          OR MINUS WHATEVER OFFSET FROM THE MEAN IN THE GALACTOCENTRIC STREAMFRAME. 
+
+
     mock observations from galactocentric phase space: viamock.xv_to_table ->
     ICRS_from_table -> a great-circle frame fit to the stars (fit_streamframe) -> paint +
     noise -> (if prog_w is given) subtract the progenitor orbit.
