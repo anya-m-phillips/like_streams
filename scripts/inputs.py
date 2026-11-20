@@ -256,10 +256,39 @@ def ICRS_from_table(tab):
     )
     return coords_ICRS
 
-def inputs_galactocentric(stars_w, prog_w=None, potential=None, paint_seed=42, noise_seed=42,
-                          Glim=24., m_pop=None, **track_kwargs):
-    """
 
+def jake_streamtab_from_galcen(stars_w, prog_w):
+        stream_x = stars_w[:,:3]## first three columns of stars_w
+        stream_v = stars_w[:,3:] *(u.km/u.s).to(u.kpc/u.Myr)## last three columns of stars_w * (u.km/u.s).to(u.kpc/u.Myr)
+
+        stream_xv =  np.hstack([stream_x, stream_v])# column stack stream_x and stream_v
+
+        prog_x = prog_w[:3]
+        prog_r = np.sqrt(np.sum(prog_x**(2)))
+
+        prog_v = prog_w[3:] * (u.km/u.s).to(u.kpc/u.Myr)
+        prog_xv = np.hstack([prog_x, prog_v])
+
+        sf = StreamFrame(stream_xv, prog_xv)
+        sc = sf.GetStreamFrame()
+
+        tab = Table()
+        tab['phi1'] = sc['phi1']
+        tab['phi2'] = sc['phi2']
+        tab['pm_phi1'] = sc['pm_phi1']
+        tab['pm_phi2'] = sc['pm_phi2']
+        tab['v_gsr'] = sc['vr'] #<-- technically mislabeled. this is _not_ rv in galactic standard of rest
+        tab['r'] = sc['r']
+
+        return tab, prog_r
+
+
+def inputs_galactocentric(stars_w, prog_w=None, potential=None, paint_seed=42, noise_seed=42,
+                          Glim=24., m_pop=None, 
+                          stream_frame='great_circle', #<--- 'great_circle' or 'galactocentric'
+                          distance=None, # if the streamframe is 'galactocentric' re-scale the magnitudes as if the progenitor is at this distance (if not none). TODO helper function for earth-progenitor distance.  
+                          **track_kwargs):
+    """
     TODO: OPTION TO RETURN THE TABLE IN GALACTOCENTRIC "STREAMFRAME" COORDINATES.
           FOR DISTANCE I'D LIKE TO USE THE MEAN DISTANCE OF THE STREAM FROM THE EARTH, 
           AND THEN JUST TAKE LIKE RENORMALIZE THE MAGNITUDES TO BE AT THAT DISTANCE PLUS
@@ -290,25 +319,48 @@ def inputs_galactocentric(stars_w, prog_w=None, potential=None, paint_seed=42, n
     prog_track_observed's; None without prog_w). NOT reflex corrected, stars or orbit
     (so 'v_gsr' here is the heliocentric rv, and the pms include the solar reflex).
     """
-    tab = viamock.xv_to_table(stars_w)                     # ra, dec, distance, dm, rv, ...
 
-    icrs_data = ICRS_from_table(tab) # create an astropy coordinates object with ra, dec, proper motions, v_gsr,...
-    streamframe, streamframe_data = fit_streamframe(icrs_data)
+    ##### OPTION 1: stream frame based on ICRS coordinates
+    if stream_frame=='great_circle':
+        tab = viamock.xv_to_table(stars_w)                     # ra, dec, distance, dm, rv, ...
 
-    tab['phi1']     = streamframe_data.phi1.to(u.degree).value #degree / remove units
-    tab['phi2']     = streamframe_data.phi2.to(u.degree).value #deg
-    tab['pm_phi1']  = streamframe_data.pm_phi1_cosphi2.to(u.mas/u.yr).value #mas/yr
-    tab['pm_phi2']  = streamframe_data.pm_phi2.to(u.mas/u.yr).value
-    tab['v_gsr']    = streamframe_data.radial_velocity.to(u.km/u.s).value # km/s
-    tab['distance'] = streamframe_data.distance.to(u.kpc).value #kpc
+        icrs_data = ICRS_from_table(tab) # create an astropy coordinates object with ra, dec, proper motions, v_gsr,...
+        streamframe, streamframe_data = fit_streamframe(icrs_data) #<-- streamframe (no underscore) becomes the astropy coordinates object for transformation. 
 
+        tab['phi1']     = streamframe_data.phi1.to(u.degree).value #degree / remove units
+        tab['phi2']     = streamframe_data.phi2.to(u.degree).value #deg
+        tab['pm_phi1']  = streamframe_data.pm_phi1_cosphi2.to(u.mas/u.yr).value #mas/yr
+        tab['pm_phi2']  = streamframe_data.pm_phi2.to(u.mas/u.yr).value
+        tab['v_gsr']    = streamframe_data.radial_velocity.to(u.km/u.s).value # km/s
+        tab['distance'] = streamframe_data.distance.to(u.kpc).value #kpc
+
+
+
+    if stream_frame=='galactocentric':
+        tab, prog_r = jake_streamtab_from_galcen(stars_w, prog_w)
+
+        if distance is None:
+            tab['distance'] = tab['r']
+        else:
+            tab['distance'] = tab['r'] - prog_r + distance #<--- put the stream as if the progenitor is at this distance... a little wack maybe. 
+        
+
+    # then paint and noise only cares about the distance column! 
     ssc_table = paint_and_noise(tab, paint_seed=paint_seed, noise_seed=noise_seed, Glim=Glim, m_pop=m_pop)
 
     # straighten after painting + noising: the noise is additive, so this is the same as
     # noising the straightened columns, and paint_ssp sees the true distances either way.
     track = None
     if prog_w is not None:
-        track = prog_track_in_frame(prog_w, streamframe, potential=potential, **track_kwargs)
+        ##### NEED AN OPTION FOR GALACTOCENTRIC VS OBSERVED FRAME!!!
+        if stream_frame=='great_circle':
+            sf = streamframe #<-- the astropy coordinate frame object
+        if stream_frame=='galactocentric':
+            sf = None #<-- so that the prog track will default to jake's frame
+        track = prog_track_in_frame(prog_w, sf, potential=potential, **track_kwargs)
+        if stream_frame=='galactocentric':
+            track['v_gsr']=track['vr']
+            streamframe = None #<-- so that the return is okay. 
         ssc_table = subtract_prog_track(ssc_table, track)
 
     return ssc_table, streamframe, track

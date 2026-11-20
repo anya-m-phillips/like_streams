@@ -108,15 +108,13 @@ pot_bar = tse.load_potential(host_dir+'pot_bar_z0.ini')
 pot_dm = tse.load_potential(host_dir+'pot_dm_z0.ini')
 pot_total = pot_bar+pot_dm
 R_peris = catalog['Rperi']
-# %%
+
 prog_masses = catalog['prog_mass']
 prog_ws = catalog['prog_coords_z0']
 stars_ws = catalog['st_coords_z0']
 
-
-
 # %%
-index = 4200 # 1000 wraps the galaxy!
+index = 450## 436 #1000 wraps the galaxy!
 stars_w = stars_ws[index]
 prog_w = prog_ws[index]
 prog_mass = prog_masses[index]
@@ -126,19 +124,23 @@ fig,ax = plt.subplots()
 ax.scatter(stars_w[:,0], stars_w[:,1], s=1, c='k')
 
 # %%
+
 print("creating stream for progenitor mass %i; rperi=%.1f"%(prog_mass, Rperi))
 ssc_table, streamframe, track = inputs.inputs_galactocentric(stars_w, prog_w, 
                                                              potential=pot_total, 
+                                                             distance=10, #kpc
+                                                             stream_frame='galactocentric',
                                                              Glim=24, m_pop=prog_mass) # TODO: LET THE SSP TOTAL MASS CHANGE!
-# %%
+additional_clips = (np.abs(ssc_table['phi2'])<10) & (np.abs(ssc_table['v_gsr'])<50)
+
 fig, ax = plt.subplots(figsize=(8,3))
-ax.scatter(ssc_table['phi1'], 
-           ssc_table['pm_phi1'], 
+ax.scatter(ssc_table['phi1'][additional_clips], 
+           ssc_table['v_gsr'][additional_clips], 
            s=1, 
            c='k')
 
-# for kk in np.quantile(ssc_table['phi1'], [0.05, 0.95]):
-#     ax.axvline(kk)
+
+
 # %%
 #---------------------------------------------------#
 #   creating the grid that the filter will search   #
@@ -146,13 +148,16 @@ ax.scatter(ssc_table['phi1'],
 #   phi1, how many points i want                    #
 #---------------------------------------------------#
 # create the grid to search over
-d_phi1 = (max(ssc_table['phi1'])-min(ssc_table['phi1'])) / 100.
-
 lo, hi = np.quantile(ssc_table['phi1'], [0.01,0.99])
+stream_length = hi-lo
+if stream_length>200:
+    lo, hi=-100,100
+    stream_length=hi-lo
+
+d_phi1 = stream_length/100
 loc_grid = np.arange(lo, hi, d_phi1) # degree increments. 
 
 n_points = 50
-stream_length = hi-lo
 wmin = stream_length / 2000
 wmax = stream_length / 20
 w_grid = np.geomspace(wmin, wmax, n_points) # this basically makes sense for GD1; trying to keep it proportional for the stubbier streams. 
@@ -169,14 +174,15 @@ for key in filter.GRID_KEYS:
     grid_dict['sig_'+key] = np.linspace(0.2, 3, n_sig) * filter.streamwidths_test[key]
 
 unc=True #<-- whether to use errors and place precision constraints. 
-filter_window_factor = 2. # filter window half-width = filter_window_factor*max(w grid)
+filter_window_factor = 3. # filter window half-width = filter_window_factor*max(w grid)
 
 
 # %%
 # RUN THE grid search
-res = filter.gridsearch(grid_dict, ssc_table,
+res = filter.gridsearch(grid_dict, ssc_table[additional_clips],
                         uncertainties=unc, n_proc=1,
-                        filter_window_factor=filter_window_factor)
+                        filter_window_factor=filter_window_factor,
+                        min_stars=15)
 # the result 'res' is a dictionary. A, m, and b have a highest likelihood value and uncertainty for each point on the grid in (w, l, intrinsic width) and in each dimension. 
 #   so e.g., res['A_hat'] and res['sigma_A'] have shape [pert location grid, w grid, intrinsic width grid, 4 dimensions]
 #   and are the highest likelihood amp and its uncertainty in each dimension at each grid point
@@ -197,18 +203,20 @@ ghosts = filter.ghost_flags(margs, grid_dict, res, peaks,
 show_ghosts = True # True: ghost-flagged peaks in light coral. False: hide them.
 
 # make diagnostic figure.
-fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table, uncertainties=unc,
+fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table[additional_clips], uncertainties=unc,
                                 z_thresh=z_thresh, phi1_true=None,#phi1_true,
                                 # subtract_poly=False, poly_deg=5,
                                 # prog_subtracted=prog_subtracted,
                                 # keys=['v_gsr'],
-                                # keep_peaks={'v_gsr':[0]},
+                                # keep_peaks={'v_gsr':[16]},
                                 margs=margs, 
                                 prof=None, w_meds=None, peaks=peaks,
                                 ghosts=ghosts, show_ghosts=show_ghosts)
 for row in axs:
     for ax in row:
         ax.set_xlim(lo, hi)
+# %%
+
 # %%
 # shapes of p(w | l) at each z peak, one panel per dimension, with A and sig marginalised
 # out (the same (w, sig) weights as p(A | l), summed over sig). each curve is the
@@ -228,7 +236,7 @@ for k, key in enumerate(filter.GRID_KEYS):
     for i, (c, il) in enumerate(zip(colors, pk)):
         ratio = margs[k]['var_between'][il] / margs[k]['var_within'][il]
         ax.plot(w_ax, p_w[il], color=c, lw=1.5,
-                ls='--' if ghosts[k]['flag'][i] else '-',
+                 ls='--' if ghosts[k]['flag'][i] else '-',
                 label=r'$l = %.0f$, $z = %.1f$, btw/wtn $= %.2g$, %s'
                       % (grid_dict['l'][il], margs[k]['z'][il], ratio, ghosts[k]['class'][i]))
     ax.axvline(w_ax[-1], color='gray', ls=':', lw=1)
