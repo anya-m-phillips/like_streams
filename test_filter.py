@@ -50,50 +50,58 @@ import artpop
 #--------------------------------------------------------------#
 #            example with contrived perturbations              #
 #--------------------------------------------------------------#
-# orbit='gd1'
+orbit='gd1'
 
-# #  example of good perturbation that i generate
+#  example of good perturbation that i generate
+perturber_dict = {
+    "mass":1e7,
+    # "mass":1e7,
+    "scaleRadius":0.5,
+    "truncationRadius":0.5,
+    "b":0,
+    "v": 100,
+    "t_impact":0.1 / tse.timeUnitGyr,
+    'phi1_today':20,
+    # "phi1_today":6,
+    'b_trl':np.array([0,0,1]),
+    'v_trl':np.array([1/np.sqrt(2),1/np.sqrt(2),0]),
+    'ramp_frac':0.1 # idk
+}
+
+
+
+
+# #   example of no perturbation
 # perturber_dict = {
-#     "mass":5e6,
-#     # "mass":1e7,
+#     "mass":5e1,
 #     "scaleRadius":0.5,
 #     "truncationRadius":0.5,
-#     "b":0,
-#     "v": 100,
+#     "b":1000000000000,
+#     "v": 10000000000,
 #     "t_impact":0.05 / tse.timeUnitGyr,
 #     'phi1_today':20,
-#     # "phi1_today":-6,
 #     'b_trl':np.array([0,0,1]),
 #     'v_trl':np.array([1/np.sqrt(2),1/np.sqrt(2),0]),
 #     'ramp_frac':0.1 # idk
 # }
 
-# # #   example of no perturbation
-# # perturber_dict = {
-# #     "mass":5e1,
-# #     "scaleRadius":0.5,
-# #     "truncationRadius":0.5,
-# #     "b":1000000000000,
-# #     "v": 10000000000,
-# #     "t_impact":0.05 / tse.timeUnitGyr,
-# #     'phi1_today':20,
-# #     'b_trl':np.array([0,0,1]),
-# #     'v_trl':np.array([1/np.sqrt(2),1/np.sqrt(2),0]),
-# #     'ramp_frac':0.1 # idk
-# # }
-# print("generating perturbed stream. ")
-# # one bad row (e.g. a NaN subrt, which agama refuses as a truncation radius) used to kill
-# # the task and lose the rest of the chunk. now it's logged and skipped.
-# pert_dict_out = tse.gen_perturbed_stream(orbit,
-#                                             perturber_dict,
-#                                             fname=None,
-#                                             Nstars=10000, #<-- since I'm submitting as an array, idrc about making this a little slow...
-#                                             save=False, outdir=None,
-#                                             # outdir=OUTDIR+'%s/'%orbit,
-#                                             mass_loss=True, tdis_gyr=0.1
-#                                             )
 
-# stars_w, prog_w = pert_dict_out['stars_w'], pert_dict_out['prog_w'] #<-- eventually this will be something that I just get from Lucas. 
+
+print("generating perturbed stream. ")
+# one bad row (e.g. a NaN subrt, which agama refuses as a truncation radius) used to kill
+# the task and lose the rest of the chunk. now it's logged and skipped.
+pert_dict_out = tse.gen_perturbed_stream(orbit,
+                                            perturber_dict,
+                                            fname=None,
+                                            Nstars=10000, #<-- since I'm submitting as an array, idrc about making this a little slow...
+                                            save=False, outdir=None,
+                                            # outdir=OUTDIR+'%s/'%orbit,
+                                            mass_loss=True, tdis_gyr=0.1
+                                            )
+
+stars_w, prog_w = pert_dict_out['stars_w'], pert_dict_out['prog_w'] #<-- eventually this will be something that I just get from Lucas. 
+pot_total = None
+prog_mass = 1e4
 # %%
 #---------------------------------------------------------------------#
 #        examples with Lucas' streams in dreams potentials            #
@@ -113,8 +121,8 @@ prog_masses = catalog['prog_mass']
 prog_ws = catalog['prog_coords_z0']
 stars_ws = catalog['st_coords_z0']
 
-# %%
-index = 450## 436 #1000 wraps the galaxy!
+
+index = 410## 436 #1000 wraps the galaxy!
 stars_w = stars_ws[index]
 prog_w = prog_ws[index]
 prog_mass = prog_masses[index]
@@ -125,13 +133,15 @@ ax.scatter(stars_w[:,0], stars_w[:,1], s=1, c='k')
 
 # %%
 
-print("creating stream for progenitor mass %i; rperi=%.1f"%(prog_mass, Rperi))
+# print("creating stream for progenitor mass %i; rperi=%.1f"%(prog_mass, Rperi))
 ssc_table, streamframe, track = inputs.inputs_galactocentric(stars_w, prog_w, 
                                                              potential=pot_total, 
-                                                             distance=20, #kpc
+                                                             distance=15, #kpc
                                                              stream_frame='galactocentric',
                                                              subtract_orbit=True,
                                                              Glim=24, m_pop=prog_mass) # TODO: LET THE SSP TOTAL MASS CHANGE!
+
+# %%
 additional_clips = np.ones(len(ssc_table), dtype=bool)# None #(np.abs(ssc_table['phi2'])<10) & (np.abs(ssc_table['v_gsr'])<50)
 
 fig, ax = plt.subplots(figsize=(8,3))
@@ -140,6 +150,11 @@ ax.scatter(ssc_table['phi1'][additional_clips],
            s=1, 
            c='k')
 
+# r = np.mean(ssc_table['r']) 
+# scale = 3
+# phi1_scale = scale/r * u.radian.to(u.degree)
+# ax.axvspan(perturber_dict['phi1_today']-phi1_scale/2, perturber_dict['phi1_today']+phi1_scale/2,
+#            alpha=0.2)
 
 
 # %%
@@ -158,9 +173,14 @@ if stream_length>200:
 d_phi1 = stream_length/100
 loc_grid = np.arange(lo, hi, d_phi1) # degree increments. 
 
-n_points = 50
+n_points = 100
 wmin = stream_length / 2000
-wmax = stream_length / 20
+
+width_max_physical = 1 # kpc
+dist_avg = np.mean(ssc_table['distance']) 
+maxwidth_angle = width_max_physical / dist_avg * u.radian.to(u.degree)
+wmax = maxwidth_angle# stream_length / 20
+print(wmax)
 w_grid = np.geomspace(wmin, wmax, n_points) # this basically makes sense for GD1; trying to keep it proportional for the stubbier streams. 
 
 # perturbation locations and widths:
@@ -183,7 +203,7 @@ filter_window_factor = 3. # filter window half-width = filter_window_factor*max(
 res = filter.gridsearch(grid_dict, ssc_table[additional_clips],
                         uncertainties=unc, n_proc=1,
                         filter_window_factor=filter_window_factor,
-                        min_stars=15)
+                        min_stars=100)
 # the result 'res' is a dictionary. A, m, and b have a highest likelihood value and uncertainty for each point on the grid in (w, l, intrinsic width) and in each dimension. 
 #   so e.g., res['A_hat'] and res['sigma_A'] have shape [pert location grid, w grid, intrinsic width grid, 4 dimensions]
 #   and are the highest likelihood amp and its uncertainty in each dimension at each grid point
@@ -208,13 +228,13 @@ fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table[additional_clips]
                                 z_thresh=z_thresh, phi1_true=None,#phi1_true,
                                 # subtract_poly=False, poly_deg=5,
                                 # prog_subtracted=prog_subtracted,
-                                # keys=['v_gsr'],
+                                keys=['v_gsr', 'pm_phi1'],
                                 # keep_peaks={'v_gsr':[16]},
                                 margs=margs, 
                                 prof=None, w_meds=None, peaks=peaks,
                                 ghosts=ghosts, show_ghosts=show_ghosts)
 
-axs[-1,-1].set_ylim(-50,50)
+# axs[-1,-1].set_ylim(-50,50)
 for row in axs:
     for ax in row:
         ax.set_xlim(lo, hi)
