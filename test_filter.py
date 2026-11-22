@@ -47,26 +47,27 @@ import viamock  # viamock + extra site-packages are put on sys.path by paths.py
 import artpop
 
 # %%
-# #--------------------------------------------------------------#
-# #            example with contrived perturbations              #
-# #--------------------------------------------------------------#
-# orbit='gd1'
+#--------------------------------------------------------------#
+#            example with contrived perturbations              #
+#--------------------------------------------------------------#
+orbit='gd1'
 
-# #  example of good perturbation that i generate
-# perturber_dict = {
-#     "mass":1e7,
-#     # "mass":1e7,
-#     "scaleRadius":0.5,
-#     "truncationRadius":0.5,
-#     "b":0,
-#     "v": 100,
-#     "t_impact":0.1 / tse.timeUnitGyr,
-#     'phi1_today':20,
-#     # "phi1_today":6,
-#     'b_trl':np.array([0,0,1]),
-#     'v_trl':np.array([1/np.sqrt(2),1/np.sqrt(2),0]),
-#     'ramp_frac':0.1 # idk
-# }
+#  example of good perturbation that i generate
+perturber_dict = {
+    "mass":3e6,
+    # "mass":1e7,
+    "scaleRadius":0.5,
+    "truncationRadius":0.5,
+    "b":0,
+    "v": 100,
+    "t_impact":0.1 / tse.timeUnitGyr,
+    'phi1_today':20,
+    # "phi1_today":6,
+    'b_trl':np.array([0,0,1]),
+    'v_trl':np.array([1/np.sqrt(2),1/np.sqrt(2),0]),
+    # 'v_trl':np.array([1,0,0]),
+    'ramp_frac':0.1 # idk
+}
 
 
 
@@ -87,54 +88,54 @@ import artpop
 
 
 
-# print("generating perturbed stream. ")
-# # one bad row (e.g. a NaN subrt, which agama refuses as a truncation radius) used to kill
-# # the task and lose the rest of the chunk. now it's logged and skipped.
-# pert_dict_out = tse.gen_perturbed_stream(orbit,
-#                                             perturber_dict,
-#                                             fname=None,
-#                                             Nstars=10000, #<-- since I'm submitting as an array, idrc about making this a little slow...
-#                                             save=False, outdir=None,
-#                                             # outdir=OUTDIR+'%s/'%orbit,
-#                                             mass_loss=True, tdis_gyr=0.1
-#                                             )
+print("generating perturbed stream. ")
+# one bad row (e.g. a NaN subrt, which agama refuses as a truncation radius) used to kill
+# the task and lose the rest of the chunk. now it's logged and skipped.
+pert_dict_out = tse.gen_perturbed_stream(orbit,
+                                         perturber_dict,
+                                         fname=None,
+                                         Nstars=10000, #<-- since I'm submitting as an array, idrc about making this a little slow...
+                                         save=False, outdir=None,
+                                         # outdir=OUTDIR+'%s/'%orbit,
+                                         mass_loss=True, tdis_gyr=0.1
+                                         )
 
-# stars_w, prog_w = pert_dict_out['stars_w'], pert_dict_out['prog_w'] #<-- eventually this will be something that I just get from Lucas. 
-# pot_total = None
-# prog_mass = 1e4
+stars_w, prog_w = pert_dict_out['stars_w'], pert_dict_out['prog_w'] #<-- eventually this will be something that I just get from Lucas. 
+pot_total = None
+prog_mass = 2e4
 # %%
-#---------------------------------------------------------------------#
-#        examples with Lucas' streams in dreams potentials            #
-#---------------------------------------------------------------------#
-host_n = 436
-host_dir = f'./lucas_streams/run_%i/'%host_n
-fsave = host_dir+'stream_catalog_run_%i.pkl'%host_n
-with open(fsave, 'rb') as f:
-    catalog=pickle.load(f)
+# #---------------------------------------------------------------------#
+# #        examples with Lucas' streams in dreams potentials            #
+# #---------------------------------------------------------------------#
+# host_n = 436
+# host_dir = f'./lucas_streams/run_%i/'%host_n
+# fsave = host_dir+'stream_catalog_run_%i.pkl'%host_n
+# with open(fsave, 'rb') as f:
+#     catalog=pickle.load(f)
 
-pot_bar = tse.load_potential(host_dir+'pot_bar_z0.ini')
-pot_dm = tse.load_potential(host_dir+'pot_dm_z0.ini')
-pot_total = pot_bar+pot_dm
-R_peris = catalog['Rperi']
-
-
-
-prog_masses = catalog['prog_mass']
-
-# do some cut on stream length
-
-prog_ws = catalog['prog_coords_z0']
-stars_ws = catalog['st_coords_z0']
+# pot_bar = tse.load_potential(host_dir+'pot_bar_z0.ini')
+# pot_dm = tse.load_potential(host_dir+'pot_dm_z0.ini')
+# pot_total = pot_bar+pot_dm
+# R_peris = catalog['Rperi']
 
 
-index = 105## 436 #1000 wraps the galaxy!
-stars_w = stars_ws[index]
-prog_w = prog_ws[index]
-prog_mass = prog_masses[index]
-Rperi = R_peris[index]
 
-fig,ax = plt.subplots()
-ax.scatter(stars_w[:,0], stars_w[:,1], s=1, c='k')
+# prog_masses = catalog['prog_mass']
+
+# # do some cut on stream length
+
+# prog_ws = catalog['prog_coords_z0']
+# stars_ws = catalog['st_coords_z0']
+
+
+# index = 105## 436 #1000 wraps the galaxy!
+# stars_w = stars_ws[index]
+# prog_w = prog_ws[index]
+# prog_mass = prog_masses[index]
+# Rperi = R_peris[index]
+
+# fig,ax = plt.subplots()
+# ax.scatter(stars_w[:,0], stars_w[:,1], s=1, c='k')
 
 # %%
 
@@ -142,20 +143,20 @@ ax.scatter(stars_w[:,0], stars_w[:,1], s=1, c='k')
 ssc_table, streamframe, track = inputs.inputs_galactocentric(stars_w, prog_w, 
                                                              potential=pot_total, 
                                                              distance=None, #kpc
-                                                             stream_frame='galactocentric',
+                                                             stream_frame='great_circle',
                                                              subtract_orbit=True,
                                                              Glim=24, m_pop=prog_mass) # TODO: LET THE SSP TOTAL MASS CHANGE!
 
 
 ### OPTION TO FIT AND SUBTRACT A 5th oRDER POLYNOMIAL TO THE NOIELESS DATA> 
-# additional_clips = np.ones(len(ssc_table), dtype=bool)# None #(np.abs(ssc_table['phi2'])<10) & (np.abs(ssc_table['v_gsr'])<50)
-additional_clips = np.abs(ssc_table['phi1'])<100
-ssc_table[additional_clips] = inputs.subtract_polynomial(ssc_table[additional_clips], n=5)
+additional_clips = np.ones(len(ssc_table), dtype=bool)# None #(np.abs(ssc_table['phi2'])<10) & (np.abs(ssc_table['v_gsr'])<50)
+# additional_clips = np.abs(ssc_table['phi1'])<100
+# ssc_table[additional_clips] = inputs.subtract_polynomial(ssc_table[additional_clips], n=5)
 # %%
 
 fig, ax = plt.subplots(figsize=(8,3))
 ax.scatter(ssc_table['phi1'][additional_clips], 
-           ssc_table['phi2'][additional_clips], 
+           ssc_table['v_gsr'][additional_clips], 
            s=1, 
            c='k')
 
@@ -179,18 +180,24 @@ if stream_length>200:
     lo, hi=-100,100
     stream_length=hi-lo
 
-d_phi1 = stream_length/100
-loc_grid = np.arange(lo, hi, d_phi1) # degree increments. 
 
 n_points = 100
 wmin = stream_length / 2000
 
 width_max_physical = 1 # kpc
-dist_avg = np.mean(ssc_table['r']) 
+dist_avg = np.mean(ssc_table['distance']) 
 maxwidth_angle = width_max_physical / dist_avg * u.radian.to(u.degree)
 wmax = maxwidth_angle# stream_length / 20
 print(wmax)
 w_grid = np.geomspace(wmin, wmax, n_points) # this basically makes sense for GD1; trying to keep it proportional for the stubbier streams. 
+
+filter_window_factor = 3. # filter window half-width = filter_window_factor*max(w grid)
+
+d_phi1 = stream_length/100
+lo+=wmax
+hi-=wmax
+loc_grid = np.arange(lo, hi, d_phi1) # degree increments. 
+
 
 # perturbation locations and widths:
 grid_dict = {
@@ -204,7 +211,6 @@ for key in filter.GRID_KEYS:
     grid_dict['sig_'+key] = np.linspace(0.2, 3, n_sig) * filter.streamwidths_test[key]
 
 unc=True #<-- whether to use errors and place precision constraints. 
-filter_window_factor = 2. # filter window half-width = filter_window_factor*max(w grid)
 
 
 # %%
@@ -224,7 +230,7 @@ margs = [filter.marginal_A(res, grid_dict, k) for k in tqdm(range(len(filter.GRI
 # to get margs['z'] (or the detection statistic) we've inverted a standard gaussian CDF at P_+
 # %%
 # detections: local maxima of |z(l)| that reach z_thresh -- 
-z_thresh = 3
+z_thresh = 4
 peaks = filter.find_z_peaks(margs, z_thresh=z_thresh) # finds peaks in the amplitude (in units of its uncertainty) along the stream
 # ghost tests from the shape of p(w | l). rerun=True searches the peaks with no parent
 # again on a w grid extended past max(w), to see if p(w | l) follows the edge.
@@ -237,12 +243,16 @@ fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table[additional_clips]
                                 z_thresh=z_thresh, phi1_true=None,#phi1_true,
                                 # subtract_poly=False, poly_deg=5,
                                 # prog_subtracted=prog_subtracted,
-                                keys=['phi2', 'v_gsr', 'pm_phi1'],
+                                keys=['phi2', 'v_gsr'],#, 'pm_phi1'],
                                 # keep_peaks={'v_gsr':[16]},
                                 margs=margs, 
                                 prof=None, w_meds=None, peaks=peaks,
                                 ghosts=ghosts, show_ghosts=show_ghosts)
 
+fs=15
+axs[0,0].set_title("all stream data", fontsize=fs)
+axs[0,1].set_title(r"Maximum likelihood amplitudes after marginalizing", fontsize=fs)
+axs[0,2].set_title(r"Noised, $G<24, ~\rm Via~\sigma_{\rm RV}<5\rm km/s$", fontsize=fs)
 # axs[-1,-1].set_ylim(-50,50)
 # for row in axs:
 #     for ax in row:
