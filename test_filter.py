@@ -54,13 +54,13 @@ orbit='gd1'
 
 #  example of good perturbation that i generate
 perturber_dict = {
-    "mass":3e6,
+    "mass":5e5,
     # "mass":1e7,
-    "scaleRadius":0.5,
-    "truncationRadius":0.5,
+    "scaleRadius":0.2,
+    "truncationRadius":0.2,
     "b":0,
-    "v": 100,
-    "t_impact":0.1 / tse.timeUnitGyr,
+    "v": 85,
+    "t_impact":0.25 / tse.timeUnitGyr,
     'phi1_today':20,
     # "phi1_today":6,
     'b_trl':np.array([0,0,1]),
@@ -102,7 +102,7 @@ pert_dict_out = tse.gen_perturbed_stream(orbit,
 
 stars_w, prog_w = pert_dict_out['stars_w'], pert_dict_out['prog_w'] #<-- eventually this will be something that I just get from Lucas. 
 pot_total = None
-prog_mass = 2e4
+prog_mass = 1.12e4
 # %%
 # #---------------------------------------------------------------------#
 # #        examples with Lucas' streams in dreams potentials            #
@@ -145,7 +145,7 @@ ssc_table, streamframe, track = inputs.inputs_galactocentric(stars_w, prog_w,
                                                              distance=None, #kpc
                                                              stream_frame='great_circle',
                                                              subtract_orbit=True,
-                                                             Glim=24, m_pop=prog_mass) # TODO: LET THE SSP TOTAL MASS CHANGE!
+                                                             Glim=22, m_pop=prog_mass) # TODO: LET THE SSP TOTAL MASS CHANGE!
 
 
 ### OPTION TO FIT AND SUBTRACT A 5th oRDER POLYNOMIAL TO THE NOIELESS DATA> 
@@ -153,7 +153,6 @@ additional_clips = np.ones(len(ssc_table), dtype=bool)# None #(np.abs(ssc_table[
 # additional_clips = np.abs(ssc_table['phi1'])<100
 # ssc_table[additional_clips] = inputs.subtract_polynomial(ssc_table[additional_clips], n=5)
 # %%
-
 fig, ax = plt.subplots(figsize=(8,3))
 ax.scatter(ssc_table['phi1'][additional_clips], 
            ssc_table['v_gsr'][additional_clips], 
@@ -165,6 +164,8 @@ ax.scatter(ssc_table['phi1'][additional_clips],
 # phi1_scale = scale/r * u.radian.to(u.degree)
 # ax.axvspan(perturber_dict['phi1_today']-phi1_scale/2, perturber_dict['phi1_today']+phi1_scale/2,
 #            alpha=0.2)
+
+
 
 
 # %%
@@ -181,10 +182,12 @@ if stream_length>200:
     stream_length=hi-lo
 
 
+# lo, hi = -70, -20
+
 n_points = 100
 wmin = stream_length / 2000
 
-width_max_physical = 1 # kpc
+width_max_physical = 1. # kpc
 dist_avg = np.mean(ssc_table['distance']) 
 maxwidth_angle = width_max_physical / dist_avg * u.radian.to(u.degree)
 wmax = maxwidth_angle# stream_length / 20
@@ -230,7 +233,7 @@ margs = [filter.marginal_A(res, grid_dict, k) for k in tqdm(range(len(filter.GRI
 # to get margs['z'] (or the detection statistic) we've inverted a standard gaussian CDF at P_+
 # %%
 # detections: local maxima of |z(l)| that reach z_thresh -- 
-z_thresh = 4
+z_thresh = 3
 peaks = filter.find_z_peaks(margs, z_thresh=z_thresh) # finds peaks in the amplitude (in units of its uncertainty) along the stream
 # ghost tests from the shape of p(w | l). rerun=True searches the peaks with no parent
 # again on a w grid extended past max(w), to see if p(w | l) follows the edge.
@@ -239,11 +242,12 @@ ghosts = filter.ghost_flags(margs, grid_dict, res, peaks,
 show_ghosts = True # True: ghost-flagged peaks in light coral. False: hide them.
 
 # make diagnostic figure.
-fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table[additional_clips], uncertainties=unc,
+fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table[additional_clips], 
+                                     uncertainties=unc,
                                 z_thresh=z_thresh, phi1_true=None,#phi1_true,
                                 # subtract_poly=False, poly_deg=5,
                                 # prog_subtracted=prog_subtracted,
-                                keys=['phi2', 'v_gsr'],#, 'pm_phi1'],
+                                keys=['phi2','pm_phi1', 'v_gsr'],#, 'pm_phi1'],
                                 # keep_peaks={'v_gsr':[16]},
                                 margs=margs, 
                                 prof=None, w_meds=None, peaks=peaks,
@@ -252,12 +256,16 @@ fig, axs, _ = filter.plot_detections(res, grid_dict, ssc_table[additional_clips]
 fs=15
 axs[0,0].set_title("all stream data", fontsize=fs)
 axs[0,1].set_title(r"Maximum likelihood amplitudes after marginalizing", fontsize=fs)
-axs[0,2].set_title(r"Noised, $G<24, ~\rm Via~\sigma_{\rm RV}<5\rm km/s$", fontsize=fs)
+axs[0,2].set_title(r"Noised, $G<22, ~\rm Via~\sigma_{\rm RV}<5\rm km/s$", fontsize=fs)
 # axs[-1,-1].set_ylim(-50,50)
 # for row in axs:
 #     for ax in row:
 #         ax.set_xlim(lo, hi)
         # ax.set_xlim(-10,8)
+# %%
+
+# %%
+
 # %%
 
 # %%
